@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Task Manager</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center py-10">
+  <div class="container mx-auto p-4 bg-white shadow rounded-lg">
+    <h1 class="text-2xl font-bold text-center mb-6">Task Manager</h1>
+    <table class="min-w-full bg-white border border-gray-200 rounded-lg">
+      <thead class="bg-gray-200 text-gray-600">
+        <tr>
+          <th class="py-2 px-4 border-b">Name</th>
+          <th class="py-2 px-4 border-b">Description</th>
+          <th class="py-2 px-4 border-b">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="taskTableBody"></tbody>
+    </table>
+    <button id="addTaskBtn" class="mt-4 bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600">Add Task</button>
+  </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const taskTableBody = document.getElementById('taskTableBody');
+      const addTaskBtn = document.getElementById('addTaskBtn');
+      const socket = new WebSocket('ws://localhost:3000');
+
+      const fetchTasks = async () => {
+        const response = await fetch('/tasks');
+        const tasks = await response.json();
+        renderTasks(tasks);
+      };
+
+      const renderTasks = (tasks) => {
+        taskTableBody.innerHTML = '';
+        tasks.forEach((task) => {
+          const row = document.createElement('tr');
+
+          const nameCell = document.createElement('td');
+          nameCell.contentEditable = true;
+          nameCell.textContent = task.name || '';
+          nameCell.onblur = () => updateTask(task.id, 'name', nameCell.textContent);
+          nameCell.classList.add('py-2', 'px-4', 'border-b', 'border-gray-200');
+          row.appendChild(nameCell);
+
+          const descCell = document.createElement('td');
+          descCell.contentEditable = true;
+          descCell.textContent = task.description || '';
+          descCell.onblur = () => updateTask(task.id, 'description', descCell.textContent);
+          descCell.classList.add('py-2', 'px-4', 'border-b', 'border-gray-200');
+          row.appendChild(descCell);
+
+          const actionsCell = document.createElement('td');
+          const deleteBtn = document.createElement('button');
+          deleteBtn.textContent = 'Delete';
+          deleteBtn.onclick = () => deleteTask(task.id);
+          deleteBtn.classList.add('bg-red-500', 'text-white', 'py-1', 'px-2', 'rounded', 'hover:bg-red-600');
+          actionsCell.classList.add('py-2', 'px-4', 'border-b', 'border-gray-200');
+          actionsCell.appendChild(deleteBtn);
+          row.appendChild(actionsCell);
+
+          taskTableBody.appendChild(row);
+        });
+      };
+
+      const addTask = async () => {
+        const name = prompt('Enter task name:');
+        const description = prompt('Enter task description:');
+        await fetch('/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, description }),
+        });
+        fetchTasks();
+      };
+
+      const updateTask = async (id, column, value) => {
+        await fetch(`/tasks/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ column, value }),
+        });
+      };
+
+      const deleteTask = async (id) => {
+        await fetch(`/tasks/${id}`, { method: 'DELETE' });
+        fetchTasks();
+      };
+
+      addTaskBtn.addEventListener('click', addTask);
+
+      socket.onmessage = (event) => {
+        const updatedTask = JSON.parse(event.data);
+        fetchTasks();
+      };
+
+      fetchTasks();
+    });
+  </script>
+</body>
+</html>
